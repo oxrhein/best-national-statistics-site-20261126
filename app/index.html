@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>StatAtlas — National Statistics, Clearly</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="StatAtlas: population, GDP, health, education and climate figures for 32 countries — each one sourced and dated. Look a country up, compare it, see where it stands.">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css">
+<link href="favicon.svg" rel="icon" type="image/svg+xml">
+<link href="style.css" rel="stylesheet">
 </head>
 <body>
 <header class="site-header">
   <div class="header-inner">
-    <a class="brand" href="#/">
+    <a href="#/" class="brand">
       <span class="brand-mark">Stat<em>Atlas</em></span>
       <span class="brand-tag">National statistics, clearly</span>
     </a>
-    <nav class="main-nav" aria-label="Main navigation">
+    <nav aria-label="Main navigation" class="main-nav">
       <a href="#/">Home</a>
       <a href="#/countries">Explore</a>
       <a href="#/compare">Compare</a>
@@ -24,12 +24,10 @@
     </nav>
   </div>
 </header>
-<main class="wrap" id="app">
+<main id="app" class="wrap">
   <div class="page-head">
     <h1>Every country's numbers, clearly.</h1>
-    <p>StatAtlas gathers population, economy, health, education and climate
-    figures for 32 countries — each one sourced and dated. This page needs
-    JavaScript to render its charts and tables.</p>
+    <p>StatAtlas gathers population, economy, health, education and climate figures for 32 countries — each one sourced and dated. This page needs JavaScript to render its charts and tables.</p>
   </div>
 </main>
 <footer class="site-footer">
@@ -42,6 +40,6 @@
     <a href="#/sources">Sources &amp; method</a>
   </div>
 </footer>
-<script type="module" src="main.js"></script>
+<script src="main.js" type="module"></script>
 </body>
 </html>

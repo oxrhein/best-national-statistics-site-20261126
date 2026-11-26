@@ -8,12 +8,37 @@ import { renderCompare, renderCountries, renderCountry, renderHome, renderIndica
 const appRoot = document.getElementById('app');
 const navAnchors = [...document.querySelectorAll('.main-nav a')];
 
+// One entry per route: the key is the first hash segment, the value builds
+// the page's HTML from the route's segments and query string.
+const ROUTES = {
+  '': () => renderHome(),
+  countries: (_seg, q) => renderCountries({
+    q: q.get('q') || '',
+    region: q.get('region') || 'All',
+    sort: q.get('sort') || 'pop',
+    dir: q.get('dir') || 'desc',
+  }),
+  country: (seg) => renderCountry(seg[1] || ''),
+  compare: (_seg, q) => {
+    const picked = (q.get('c') || '').split(',').filter(Boolean);
+    return renderCompare({ c: picked.length ? picked : undefined });
+  },
+  indicators: () => renderIndicators(),
+  sources: () => renderSources(),
+};
+
+const TITLES = {
+  '': 'StatAtlas — National Statistics, Clearly',
+  countries: 'Explore Countries — StatAtlas',
+  compare: 'Compare Countries — StatAtlas',
+  indicators: 'Indicators — StatAtlas',
+  sources: 'Sources & Method — StatAtlas',
+};
+
 function readRoute() {
   const raw = location.hash.replace(/^#\/?/, '');
   const [pathPart, queryPart] = raw.split('?');
-  const segments = pathPart.split('/').filter(Boolean);
-  const query = new URLSearchParams(queryPart || '');
-  return { segments, query };
+  return { segments: pathPart.split('/').filter(Boolean), query: new URLSearchParams(queryPart || '') };
 }
 
 function markNav(route) {
@@ -26,42 +51,23 @@ function markNav(route) {
 function renderPage() {
   const { segments, query } = readRoute();
   const route = segments[0] || '';
-  let html;
-  if (route === '') {
-    html = renderHome();
-  } else if (route === 'countries') {
-    html = renderCountries({
-      q: query.get('q') || '',
-      region: query.get('region') || 'All',
-      sort: query.get('sort') || 'pop',
-      dir: query.get('dir') || 'desc',
-    });
-  } else if (route === 'country') {
-    html = renderCountry(segments[1] || '');
-  } else if (route === 'compare') {
-    const picked = (query.get('c') || '').split(',').filter(Boolean);
-    html = renderCompare({ c: picked.length ? picked : undefined });
-  } else if (route === 'indicators') {
-    html = renderIndicators();
-  } else if (route === 'sources') {
-    html = renderSources();
-  } else {
-    html = `<div class="page-head"><h1>Page not found</h1>
-      <p>That page does not exist on StatAtlas.</p></div>
-      <p><a class="btn" href="#/">Back to the home page</a></p>`;
-  }
+  const build = ROUTES[route];
+  const html = build
+    ? build(segments, query)
+    : '<div class="page-head"><h1>Page not found</h1><p>That page does not exist on StatAtlas.</p></div><p><a class="btn" href="#/">Back to the home page</a></p>';
   appRoot.innerHTML = html;
   markNav(route);
   window.scrollTo(0, 0);
   bindControls(route, query);
+  syncTitle(route, segments);
 }
 
 function pushParams(params) {
   const current = readRoute();
   const next = new URLSearchParams(current.query);
-  Object.entries(params).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(params)) {
     if (value) next.set(key, value); else next.delete(key);
-  });
+  }
   const base = '/' + current.segments.join('/');
   location.hash = base + (next.toString() ? '?' + next.toString() : '');
 }
@@ -76,52 +82,47 @@ function bindControls(route, query) {
       location.hash = '#/countries' + (q ? '?q=' + encodeURIComponent(q) : '');
     });
   }
-  if (route !== 'countries' && route !== 'compare') return;
+  if (route === 'countries') bindExploreControls();
+  if (route === 'compare') bindCompareControls();
+}
 
-  if (route === 'countries') {
-    const searchBox = document.getElementById('explore-q');
-    if (searchBox) {
-      searchBox.addEventListener('input', () => {
-        clearTimeout(searchBox._timer);
-        searchBox._timer = setTimeout(() => pushParams({ q: searchBox.value.trim() }), 350);
-      });
-    }
-    const sortSelect = document.getElementById('explore-sort');
-    if (sortSelect) {
-      sortSelect.addEventListener('change', () => pushParams({ sort: sortSelect.value, dir: 'desc' }));
-    }
-    document.querySelectorAll('#region-chips .chip').forEach((chip) => {
-      chip.addEventListener('click', () => pushParams({ region: chip.dataset.region }));
+function bindExploreControls() {
+  const searchBox = document.getElementById('explore-q');
+  if (searchBox) {
+    searchBox.addEventListener('input', () => {
+      clearTimeout(searchBox._timer);
+      searchBox._timer = setTimeout(() => pushParams({ q: searchBox.value.trim() }), 350);
     });
   }
-
-  if (route === 'compare') {
-    document.querySelectorAll('.compare-pickers select').forEach((select) => {
-      select.addEventListener('change', () => {
-        const codes = [0, 1, 2, 3]
-          .map((i) => document.getElementById('pick-' + i).value)
-          .filter((code, i, arr) => arr.indexOf(code) === i);
-        location.hash = '#/compare?c=' + codes.join(',');
-      });
-    });
+  const sortSelect = document.getElementById('explore-sort');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => pushParams({ sort: sortSelect.value, dir: 'desc' }));
   }
+  document.querySelectorAll('#region-chips .chip').forEach((chip) => {
+    chip.addEventListener('click', () => pushParams({ region: chip.dataset.region }));
+  });
+}
+
+function bindCompareControls() {
+  document.querySelectorAll('.compare-pickers select').forEach((select) => {
+    select.addEventListener('change', () => {
+      const codes = [0, 1, 2, 3]
+        .map((i) => document.getElementById('pick-' + i).value)
+        .filter((code, i, arr) => arr.indexOf(code) === i);
+      location.hash = '#/compare?c=' + codes.join(',');
+    });
+  });
 }
 
 // Keep the page title in step with the route.
-function syncTitle() {
-  const { segments } = readRoute();
-  const route = segments[0] || '';
-  const names = {
-    '': 'StatAtlas — National Statistics, Clearly',
-    countries: 'Explore Countries — StatAtlas',
-    country: (findCountry(segments[1] || '') || { name: 'Country' }).name + ' — StatAtlas',
-    compare: 'Compare Countries — StatAtlas',
-    indicators: 'Indicators — StatAtlas',
-    sources: 'Sources & Method — StatAtlas',
-  };
-  document.title = names[route] || 'StatAtlas — National Statistics, Clearly';
+function syncTitle(route, segments) {
+  if (route === 'country') {
+    const c = findCountry(segments[1] || '');
+    document.title = (c ? c.name : 'Country') + ' — StatAtlas';
+    return;
+  }
+  document.title = TITLES[route] || 'StatAtlas — National Statistics, Clearly';
 }
 
-window.addEventListener('hashchange', () => { renderPage(); syncTitle(); });
+window.addEventListener('hashchange', renderPage);
 renderPage();
-syncTitle();

@@ -9,36 +9,43 @@ import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('./app', import.meta.url)));
-const args = process.argv.slice(2);
-const portArg = args.indexOf('--port');
-const wanted = portArg === -1 ? 8080 : Number(args[portArg + 1]);
-const port = Number.isInteger(wanted) && wanted > 0 && wanted < 65536 ? wanted : 8080;
 
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-};
+function pickPort() {
+  const args = process.argv.slice(2);
+  const i = args.indexOf('--port');
+  const n = i === -1 ? 8080 : Number(args[i + 1]);
+  return Number.isInteger(n) && n > 0 && n < 65536 ? n : 8080;
+}
 
-createServer((req, res) => {
-  const url = new URL(req.url ?? '/', 'http://localhost');
+const TYPES = new Map([
+  ['.html', 'text/html; charset=utf-8'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.mjs', 'text/javascript; charset=utf-8'],
+  ['.css', 'text/css; charset=utf-8'],
+  ['.json', 'application/json; charset=utf-8'],
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+]);
+
+function safePath(requested) {
   let pathname;
   try {
-    pathname = decodeURIComponent(url.pathname);
+    pathname = decodeURIComponent(new URL(requested, 'http://localhost').pathname);
   } catch {
-    res.writeHead(400).end('bad request');
-    return;
+    return null;
   }
   if (pathname.endsWith('/')) pathname += 'index.html';
   const file = resolve(join(root, normalize(pathname)));
-  if (file !== root && !file.startsWith(root + sep)) {
-    res.writeHead(403).end('forbidden');
+  if (file !== root && !file.startsWith(root + sep)) return null;
+  return file;
+}
+
+const server = createServer((req, res) => {
+  const file = safePath(req.url ?? '/');
+  if (!file) {
+    res.writeHead(400).end('bad request');
     return;
   }
   let size;
@@ -51,11 +58,14 @@ createServer((req, res) => {
     return;
   }
   res.writeHead(200, {
-    'content-type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
+    'content-type': TYPES.get(extname(file).toLowerCase()) ?? 'application/octet-stream',
     'content-length': size,
     'cache-control': 'no-store',
   });
   createReadStream(file).pipe(res);
-}).listen(port, '127.0.0.1', () => {
+});
+
+const port = pickPort();
+server.listen(port, '127.0.0.1', () => {
   console.log(`app/ is on http://localhost:${port}`);
 });
